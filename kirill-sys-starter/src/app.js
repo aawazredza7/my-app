@@ -69,6 +69,7 @@ const savedSettings = JSON.parse(localStorage.getItem("ks-settings") || "{}");
 if (savedSettings.prompt === LEGACY_DEFAULT_PROMPT || savedSettings.prompt === PREVIOUS_DEFAULT_PROMPT || savedSettings.prompt === PREVIOUS_CURRENT_DEFAULT_PROMPT) savedSettings.prompt = DEFAULT_PROMPT;
 let settings = {...defaults, ...savedSettings};
 let history = [];
+let lastSearchResults = [];
 const memoryInput = $("memoryInput");
 if(memoryInput) memoryInput.value = loadMemory();
 const saveMemoryBtn = $("saveMemory");
@@ -85,7 +86,7 @@ function addMessage(role, text){
   const bubble=document.createElement("div");bubble.className="bubble";
   const name=document.createElement("b");name.textContent=role==="user"?"Ты":settings.name;
   const p=document.createElement("p");p.textContent=text;
-  bubble.append(name,p);row.append(bubble);$("messages").append(row);$("messages").scrollTop=$("messages").scrollHeight;
+  bubble.append(name,p);row.append(bubble);$("messages").append(row);$("messages").scrollTop=$("messages").scrollHeight;return row;
 }
 function populateVoices(){
   const select=$("voiceSelect"), current=settings.voice;
@@ -145,6 +146,23 @@ async function askAI(userText, proactive=false){
   if(!proactive){btn.disabled=true;btn.textContent="…";}
   try{
     const messages = [{role:"system",content:buildSystemPrompt()}];
+    lastSearchResults = [];
+    const searchMatch = !proactive && userText.match(/\b(найди|поищи|загугли|проверь в интернете|что нового|последние новости)\b/i);
+    if(searchMatch){
+      const query = userText.replace(/\b(найди|поищи|загугли|проверь в интернете|что нового|последние новости)\b/ig," ").replace(/[?!.,]/g," ").replace(/\s+/g," ").trim();
+      try{
+        const searchResponse = await fetch("/api/search?q=" + encodeURIComponent(query));
+        const searchData = await searchResponse.json();
+        if(!searchResponse.ok) throw new Error(searchData.error || "Ошибка поиска");
+        lastSearchResults = searchData.results || [];
+        const searchContext = lastSearchResults.length
+          ? "РЕЗУЛЬТАТЫ ПОИСКА В ИНТЕРНЕТЕ. Отвечай по ним, не добавляй неподтверждённые факты. Если источники расходятся или данных мало: скажи об этом. " + lastSearchResults.map((x,i)=>String(i+1)+". "+x.title+" — "+x.snippet+" ("+x.url+")").join("\n")
+          : "Поиск выполнен, но результатов не найдено. Не выдумывай сведения; честно скажи, что ничего надёжного не нашлось.";
+        messages.push({role:"system",content:searchContext});
+      }catch(searchError){
+        messages.push({role:"system",content:"Поиск в интернете не сработал ("+searchError.message+"). Не делай вид, что проверил информацию; ответь на основе своих знаний и обозначь неопределённость."});
+      }
+    }
     if(proactive){
       messages.push(...history.slice(-8));
       messages.push({role:"user",content:"Ты сейчас в голосовом созвоне с другом. Он некоторое время молчит. Если уместно, сам естественно начни короткую реплику по контексту разговора — шутку, наблюдение или дружеское замечание. Не говори, что заметил таймер или тишину. Не задавай формальный вопрос. Если нечего сказать, ответь ровно [SKIP]."});
@@ -180,7 +198,20 @@ async function askAI(userText, proactive=false){
     if (!answer) throw new Error("Модель вернула пустой ответ. Попробуй ещё раз или проверь, не зависла ли Ollama.");
     if(proactive && (answer==="[SKIP]" || answer.includes("[SKIP]")))return;
     history.push({role:"assistant",content:answer});
-    addMessage("assistant",answer);
+    const answerRow = addMessage("assistant",answer);
+    if(lastSearchResults.length){
+      const sourceBox = document.createElement("div");
+      sourceBox.className = "search-sources";
+      const sourceTitle = document.createElement("b");
+      sourceTitle.textContent = "Источники";
+      sourceBox.append(sourceTitle);
+      lastSearchResults.forEach(item=>{
+        const link = document.createElement("a");
+        link.href = item.url; link.target = "_blank"; link.rel = "noopener noreferrer";
+        link.textContent = item.title; sourceBox.append(link);
+      });
+      answerRow.querySelector(".bubble").append(sourceBox);
+    }
     speak(answer);
     touchActivity();
   }catch(err){
