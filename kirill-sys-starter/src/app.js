@@ -59,11 +59,37 @@ const CORE_STYLE_RULES = `ПРАВИЛА ОБЩЕНИЯ:
 const MEMORY_KEY = "ks-memory";
 function loadMemory(){ try{return localStorage.getItem(MEMORY_KEY)||"";}catch(e){return "";} }
 function saveMemory(value){ try{localStorage.setItem(MEMORY_KEY,value.slice(0,4000));}catch(e){} }
+function appendMemory(note){
+  const clean = note.replace(/\s+/g," ").trim().slice(0,240);
+  if(!clean) return false;
+  const old = loadMemory().trim();
+  if(old.toLowerCase().includes(clean.toLowerCase())) return false;
+  saveMemory((old ? "\n" : "") + "• " + clean);
+  if(memoryInput) memoryInput.value = loadMemory();
+  if($("memoryHint")) $("memoryHint").textContent = "Новая заметка сохранена в локальной памяти.";
+  return true;
+}
+function addMemorySuggestion(row,note){
+  const box=document.createElement("div");
+  box.className="memory-suggestion";
+  const label=document.createElement("span");
+  label.textContent="Могу запомнить: "+note;
+  const actions=document.createElement("div");
+  actions.className="memory-actions";
+  const yes=document.createElement("button");
+  yes.type="button"; yes.textContent="Запомнить";
+  yes.onclick=()=>{appendMemory(note);box.textContent="Запомнил.";};
+  const no=document.createElement("button");
+  no.type="button"; no.textContent="Не надо";
+  no.onclick=()=>box.remove();
+  actions.append(yes,no);box.append(label,actions);
+  row.querySelector(".bubble").append(box);
+}
 function buildSystemPrompt(){
   const custom = (settings.prompt || DEFAULT_PROMPT).trim();
   const memory = loadMemory().trim();
   const memoryBlock = memory ? "\n\nПАМЯТЬ О ПОЛЬЗОВАТЕЛЕ (используй только когда уместно; не выдумывай дополнений):\n" + memory : "";
-  return custom + "\n\n" + CORE_STYLE_RULES + memoryBlock;
+  const memoryBehavior = "\n\nЕсли пользователь сообщил устойчивый, полезный для будущих бесед факт о себе, интересах, предпочтениях или текущем проекте, добавь в самый конец ответа маркер [[REMEMBER: краткая заметка от третьего лица]]. Не более одного маркера и до 160 символов. Не добавляй его для случайных/одноразовых сведений, шуток, эмоций, чужих личных данных, паролей, адресов, медицинских, финансовых или иных чувствительных сведений. Не повторяй уже сохранённое. Если запоминать нечего — не добавляй маркер. Маркер будет предложен пользователю и сохранится только после его согласия.";\n  return custom + "\n\n" + CORE_STYLE_RULES + memoryBlock + memoryBehavior;
 }
 const savedSettings = JSON.parse(localStorage.getItem("ks-settings") || "{}");
 if (savedSettings.prompt === LEGACY_DEFAULT_PROMPT || savedSettings.prompt === PREVIOUS_DEFAULT_PROMPT || savedSettings.prompt === PREVIOUS_CURRENT_DEFAULT_PROMPT) savedSettings.prompt = DEFAULT_PROMPT;
