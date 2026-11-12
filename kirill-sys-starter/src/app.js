@@ -123,10 +123,33 @@ async function askAI(userText, proactive=false){
     } else {
       messages.push(...history.slice(-10));
     }
-    const response=await fetch("http://localhost:11434/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"qwen3.5:9b",stream:false,keep_alive:"5m",options:{num_ctx:4096,num_predict:220,temperature:0.85,top_p:0.9,repeat_penalty:1.12},messages})});
-    if(!response.ok)throw new Error("Ollama вернула ошибку "+response.status);
-    const data=await response.json();const answer=(data.message?.content||"").trim();
-    if(!answer)return;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 180000);
+    let response;
+    try {
+      response = await fetch("http://localhost:11434/api/chat", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        signal: controller.signal,
+        body: JSON.stringify({
+          model: "qwen3.5:9b",
+          stream: false,
+          think: false,
+          keep_alive: "5m",
+          options: {num_ctx: 4096, num_predict: 220, temperature: 0.85, top_p: 0.9, repeat_penalty: 1.12},
+          messages
+        })
+      });
+    } finally {
+      clearTimeout(timeoutId);
+    }
+    if (!response.ok) {
+      const detail = await response.text().catch(() => "");
+      throw new Error("Ollama: HTTP " + response.status + (detail ? " · " + detail.slice(0, 180) : ""));
+    }
+    const data = await response.json();
+    const answer = (data.message?.content || data.response || "").trim();
+    if (!answer) throw new Error("Модель вернула пустой ответ. Попробуй ещё раз или проверь, не зависла ли Ollama.");
     if(proactive && (answer==="[SKIP]" || answer.includes("[SKIP]")))return;
     history.push({role:"assistant",content:answer});
     addMessage("assistant",answer);
@@ -204,7 +227,7 @@ async function checkOllama(){
     const response = await fetch("http://localhost:11434/api/tags");
     if (!response.ok) throw new Error("HTTP " + response.status);
     const data = await response.json();
-    const installed = (data.models || []).some(model => model.name === modelName || model.name === modelName);
+    const installed = (data.models || []).some(model => model.name === modelName);
     status.textContent = installed ? "Ollama подключена · Qwen3.5 готова" : "Ollama работает · установи Qwen3.5 9B";
   } catch (error) {
     status.textContent = "Ollama не найдена · запусти её";
