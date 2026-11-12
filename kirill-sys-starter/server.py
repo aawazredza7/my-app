@@ -74,6 +74,31 @@ class Handler(SimpleHTTPRequestHandler):
             return
         return super().do_GET()
 
+
+    def do_POST(self):
+        parsed = urlparse(self.path)
+        if parsed.path != "/api/action":
+            return self.send_json(404, {"error": "Неизвестное действие"})
+        origin = self.headers.get("Origin", "")
+        if origin not in ("http://localhost:4173", "http://127.0.0.1:4173"):
+            return self.send_json(403, {"error": "Запрос отклонён"})
+        try:
+            length = min(int(self.headers.get("Content-Length", "0")), 2048)
+            payload = json.loads(self.rfile.read(length).decode("utf-8"))
+            action = payload.get("action")
+            commands = {
+                "calculator": ["calc.exe"],
+                "notepad": ["notepad.exe"],
+                "explorer": ["explorer.exe"]
+            }
+            if action not in commands:
+                return self.send_json(400, {"error": "Это действие не разрешено"})
+            import subprocess
+            subprocess.Popen(commands[action], shell=False)
+            return self.send_json(200, {"ok": True})
+        except Exception:
+            return self.send_json(400, {"error": "Не удалось выполнить действие"})
+
     def send_json(self, status, payload):
         data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         self.send_response(status)
