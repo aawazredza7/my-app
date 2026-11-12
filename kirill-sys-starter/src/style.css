@@ -32,3 +32,7 @@ button{cursor:pointer;border:0}.primary,.secondary,.save-btn{border-radius:10px;
 .memory-actions{display:flex;gap:8px}
 .memory-actions button{border:1px solid #66528a;border-radius:7px;background:#292238;color:#eee;padding:5px 10px;cursor:pointer;font:inherit}
 .memory-actions button:first-child{background:#6c4aa0;border-color:#8a68bd}
+
+/* Voice controls */
+#stopVoice{border-color:#555;color:#ddd}
+#stopVoice:hover{background:#444}
