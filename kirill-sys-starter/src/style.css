@@ -20,3 +20,9 @@ button{cursor:pointer;border:0}.primary,.secondary,.save-btn{border-radius:10px;
 .prompt-tools .prompt-hint{margin:0;flex:1}
 .prompt-reset{flex:0 0 auto;background:#303030;color:#ddd;border:1px solid #484848;border-radius:8px;padding:7px 9px;font-size:9px;font-weight:700}
 .prompt-reset:hover{background:#3b3b3b;border-color:#666}
+
+
+.search-sources{display:flex;flex-direction:column;gap:5px;margin-top:10px;padding-top:8px;border-top:1px solid #454545}
+.search-sources b{font-size:10px;color:#aaa}
+.search-sources a{font-size:10px;color:#b8a2df;text-decoration:none;overflow-wrap:anywhere}
+.search-sources a:hover{text-decoration:underline}
