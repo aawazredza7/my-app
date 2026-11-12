@@ -189,8 +189,8 @@ async function checkOllama(){
     const response = await fetch("http://localhost:11434/api/tags");
     if (!response.ok) throw new Error("HTTP " + response.status);
     const data = await response.json();
-    const installed = (data.models || []).some(model => model.name === modelName || model.name.startsWith("qwen3:4b-instruct-2507"));
-    status.textContent = installed ? "Ollama подключена · Qwen3 готова" : "Ollama работает · установи Qwen3 4B";
+    const installed = (data.models || []).some(model => model.name === modelName || model.name === modelName);
+    status.textContent = installed ? "Ollama подключена · Qwen3.5 готова" : "Ollama работает · установи Qwen3.5 9B";
   } catch (error) {
     status.textContent = "Ollama не найдена · запусти её";
   }
