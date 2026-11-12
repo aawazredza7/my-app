@@ -114,6 +114,7 @@ $("nameInput").value = settings.name;
 $("promptInput").value = settings.prompt || DEFAULT_PROMPT;
 $("rateRange").value = settings.rate;
 $("modelSelect").value=settings.model||"qwen3.5:9b";
+$("modelSelect").addEventListener("change",e=>{settings.model=e.target.value;localStorage.setItem("ks-settings",JSON.stringify(settings));$("modelLabel").textContent="Модель: "+settings.model;});
 $("heroName").textContent = settings.name;
 $("rateValue").textContent = Number(settings.rate).toFixed(2)+"×";
 function updateName(){ $("heroName").textContent = settings.name; document.title = settings.name+" — Кирилл Сыс"; }
