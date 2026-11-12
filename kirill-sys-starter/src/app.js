@@ -56,14 +56,23 @@ const CORE_STYLE_RULES = `ПРАВИЛА ОБЩЕНИЯ:
 — Если ошибся, скажи «Да, затупил» и исправь ответ. Без оправданий, нотаций и фальшивой вежливости.
 — Запрещены канцелярит, учительский тон, шаблонные вступления, мораль о мате и автоматическое предложение помощи.`;
 
+const MEMORY_KEY = "ks-memory";
+function loadMemory(){ try{return localStorage.getItem(MEMORY_KEY)||"";}catch(e){return "";} }
+function saveMemory(value){ try{localStorage.setItem(MEMORY_KEY,value.slice(0,4000));}catch(e){} }
 function buildSystemPrompt(){
   const custom = (settings.prompt || DEFAULT_PROMPT).trim();
-  return custom + "\n\n" + CORE_STYLE_RULES;
+  const memory = loadMemory().trim();
+  const memoryBlock = memory ? "\\n\\nПАМЯТЬ О ПОЛЬЗОВАТЕЛЕ (используй только когда уместно; не выдумывай дополнений):\\n" + memory : "";
+  return custom + "\\n\\n" + CORE_STYLE_RULES + memoryBlock;
 }
 const savedSettings = JSON.parse(localStorage.getItem("ks-settings") || "{}");
 if (savedSettings.prompt === LEGACY_DEFAULT_PROMPT || savedSettings.prompt === PREVIOUS_DEFAULT_PROMPT || savedSettings.prompt === PREVIOUS_CURRENT_DEFAULT_PROMPT) savedSettings.prompt = DEFAULT_PROMPT;
 let settings = {...defaults, ...savedSettings};
 let history = [];
+const memoryInput = $("memoryInput");
+if(memoryInput) memoryInput.value = loadMemory();
+const saveMemoryBtn = $("saveMemory");
+if(saveMemoryBtn) saveMemoryBtn.onclick = () => { const value = memoryInput.value.trim(); saveMemory(value); $("memoryHint").textContent = value ? "Сохранил. Кирилл будет учитывать эти заметки в новых ответах." : "Память очищена."; };
 $("nameInput").value = settings.name;
 $("promptInput").value = settings.prompt || DEFAULT_PROMPT;
 $("rateRange").value = settings.rate;
@@ -115,7 +124,24 @@ function touchActivity(){
 }
 async function askAI(userText, proactive=false){
   const btn=$("sendBtn");
-  if(!proactive){history.push({role:"user",content:userText});}
+  if(!proactive){
+    history.push({role:"user",content:userText});
+    const rememberMatch = userText.match(/^(?:запомни|сохрани в память)[: ,—-]*([\\s\\S]{2,500})$/i);
+    if(rememberMatch){
+      const oldMemory = loadMemory().trim();
+      const note = rememberMatch[1].trim();
+      if(!oldMemory.toLowerCase().includes(note.toLowerCase())){
+        saveMemory((oldMemory ? oldMemory + "\\n" : "") + "• " + note);
+        if(memoryInput) memoryInput.value = loadMemory();
+      }
+      const confirmation = "Запомнил. Это сохранено локально на этом компьютере.";
+      history.push({role:"assistant",content:confirmation});
+      addMessage("assistant",confirmation);
+      speak(confirmation);
+      if(!proactive){btn.disabled=false;btn.textContent="➤";}
+      return;
+    }
+  }
   if(!proactive){btn.disabled=true;btn.textContent="…";}
   try{
     const messages = [{role:"system",content:buildSystemPrompt()}];
