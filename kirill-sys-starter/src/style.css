@@ -26,3 +26,9 @@ button{cursor:pointer;border:0}.primary,.secondary,.save-btn{border-radius:10px;
 .search-sources b{font-size:10px;color:#aaa}
 .search-sources a{font-size:10px;color:#b8a2df;text-decoration:none;overflow-wrap:anywhere}
 .search-sources a:hover{text-decoration:underline}
+
+
+.memory-suggestion{display:flex;flex-direction:column;gap:8px;margin-top:10px;padding:10px;border:1px solid #66528a;border-radius:10px;background:rgba(125,91,180,.10);font-size:12px}
+.memory-actions{display:flex;gap:8px}
+.memory-actions button{border:1px solid #66528a;border-radius:7px;background:#292238;color:#eee;padding:5px 10px;cursor:pointer;font:inherit}
+.memory-actions button:first-child{background:#6c4aa0;border-color:#8a68bd}
