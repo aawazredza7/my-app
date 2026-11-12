@@ -68,7 +68,14 @@ function restoreHistory(){
   history.forEach(item=>addMessage(item.role,item.content));
 }
 const MEMORY_CATEGORIES={user:"О пользователе",jokes:"Наши приколы",threads:"Незаконченные темы"};
-function getMemoryItems(){try{const raw=localStorage.getItem(MEMORY_KEY)||"";if(!raw)return [];const data=JSON.parse(raw);if(Array.isArray(data))return data.filter(x=>x&&MEMORY_CATEGORIES[x.category]&&typeof x.text==="string").map((x,i)=>({id:String(x.id||"m"+i),category:x.category,text:x.text.slice(0,240)}));return raw.split(/\n+/).map(x=>x.replace(/^\s*[•-]\s*/,"").trim()).filter(Boolean).map((text,i)=>({id:"old"+i,category:"user",text:text.slice(0,240)}));}catch(e){return [];}}
+function getMemoryItems(){
+  const raw=localStorage.getItem(MEMORY_KEY)||"";
+  if(!raw)return [];
+  let data=null;
+  try{data=JSON.parse(raw);}catch(e){}
+  if(Array.isArray(data))return data.filter(x=>x&&MEMORY_CATEGORIES[x.category]&&typeof x.text==="string").map((x,i)=>({id:String(x.id||"m"+i),category:x.category,text:x.text.slice(0,240)}));
+  return raw.split(/\n+/).map(x=>x.replace(/^\s*[•-]\s*/,"").trim()).filter(Boolean).map((text,i)=>({id:"old"+i,category:"user",text:text.slice(0,240)}));
+}
 function saveMemory(items){try{localStorage.setItem(MEMORY_KEY,JSON.stringify(items).slice(0,12000));}catch(e){}}
 function loadMemory(){return ["user","jokes","threads"].map(c=>{const a=getMemoryItems().filter(x=>x.category===c);return a.length?MEMORY_CATEGORIES[c]+":\n"+a.map(x=>"• "+x.text).join("\n"):"";}).filter(Boolean).join("\n\n");}
 function renderMemory(){const list=$("memoryList");if(!list)return;list.innerHTML="";const all=getMemoryItems();["user","jokes","threads"].forEach(c=>{const sec=document.createElement("section");sec.className="memory-category";const h=document.createElement("b");h.textContent=MEMORY_CATEGORIES[c];sec.append(h);const rows=all.filter(x=>x.category===c);if(!rows.length){const p=document.createElement("p");p.className="memory-empty";p.textContent="Пока пусто";sec.append(p);}rows.forEach(item=>{const row=document.createElement("div");row.className="memory-entry";const t=document.createElement("span");t.textContent=item.text;const actions=document.createElement("div");actions.className="memory-entry-actions";const edit=document.createElement("button");edit.textContent="Изменить";edit.onclick=()=>{const v=prompt("Измени заметку:",item.text);if(v===null)return;const clean=v.trim().slice(0,240);if(clean){saveMemory(getMemoryItems().map(x=>x.id===item.id?{...x,text:clean}:x));renderMemory();}};const del=document.createElement("button");del.textContent="Удалить";del.onclick=()=>{if(confirm("Удалить заметку?")){saveMemory(getMemoryItems().filter(x=>x.id!==item.id));renderMemory();}};actions.append(edit,del);row.append(t,actions);sec.append(row);});list.append(sec);});}
