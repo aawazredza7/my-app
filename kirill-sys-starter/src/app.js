@@ -62,8 +62,8 @@ function saveMemory(value){ try{localStorage.setItem(MEMORY_KEY,value.slice(0,40
 function buildSystemPrompt(){
   const custom = (settings.prompt || DEFAULT_PROMPT).trim();
   const memory = loadMemory().trim();
-  const memoryBlock = memory ? "\\n\\nПАМЯТЬ О ПОЛЬЗОВАТЕЛЕ (используй только когда уместно; не выдумывай дополнений):\\n" + memory : "";
-  return custom + "\\n\\n" + CORE_STYLE_RULES + memoryBlock;
+  const memoryBlock = memory ? "\n\nПАМЯТЬ О ПОЛЬЗОВАТЕЛЕ (используй только когда уместно; не выдумывай дополнений):\n" + memory : "";
+  return custom + "\n\n" + CORE_STYLE_RULES + memoryBlock;
 }
 const savedSettings = JSON.parse(localStorage.getItem("ks-settings") || "{}");
 if (savedSettings.prompt === LEGACY_DEFAULT_PROMPT || savedSettings.prompt === PREVIOUS_DEFAULT_PROMPT || savedSettings.prompt === PREVIOUS_CURRENT_DEFAULT_PROMPT) savedSettings.prompt = DEFAULT_PROMPT;
@@ -127,12 +127,12 @@ async function askAI(userText, proactive=false){
   const btn=$("sendBtn");
   if(!proactive){
     history.push({role:"user",content:userText});
-    const rememberMatch = userText.match(/^(?:запомни|сохрани в память)[: ,—-]*([\\s\\S]{2,500})$/i);
+    const rememberMatch = userText.match(/^(?:запомни|сохрани в память)[: ,—-]*([\s\S]{2,500})$/i);
     if(rememberMatch){
       const oldMemory = loadMemory().trim();
       const note = rememberMatch[1].trim();
       if(!oldMemory.toLowerCase().includes(note.toLowerCase())){
-        saveMemory((oldMemory ? oldMemory + "\\n" : "") + "• " + note);
+        saveMemory((oldMemory ? oldMemory + "\n" : "") + "• " + note);
         if(memoryInput) memoryInput.value = loadMemory();
       }
       const confirmation = "Запомнил. Это сохранено локально на этом компьютере.";
