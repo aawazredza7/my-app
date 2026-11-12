@@ -67,28 +67,24 @@ function restoreHistory(){
   $("messages").innerHTML="";
   history.forEach(item=>addMessage(item.role,item.content));
 }
-function loadMemory(){ try{return localStorage.getItem(MEMORY_KEY)||"";}catch(e){return "";} }
-function saveMemory(value){ try{localStorage.setItem(MEMORY_KEY,value.slice(0,4000));}catch(e){} }
-function appendMemory(note){
-  const clean = note.replace(/\s+/g," ").trim().slice(0,240);
-  if(!clean) return false;
-  const old = loadMemory().trim();
-  if(old.toLowerCase().includes(clean.toLowerCase())) return false;
-  saveMemory((old ? "\n" : "") + "• " + clean);
-  if(memoryInput) memoryInput.value = loadMemory();
-  if($("memoryHint")) $("memoryHint").textContent = "Новая заметка сохранена в локальной памяти.";
-  return true;
-}
-function addMemorySuggestion(row,note){
+const MEMORY_CATEGORIES={user:"О пользователе",jokes:"Наши приколы",threads:"Незаконченные темы"};
+function getMemoryItems(){try{const raw=localStorage.getItem(MEMORY_KEY)||"";if(!raw)return [];const data=JSON.parse(raw);if(Array.isArray(data))return data.filter(x=>x&&MEMORY_CATEGORIES[x.category]&&typeof x.text==="string").map((x,i)=>({id:String(x.id||"m"+i),category:x.category,text:x.text.slice(0,240)}));return raw.split(/\\n+/).map(x=>x.replace(/^\\s*[•-]\\s*/,"").trim()).filter(Boolean).map((text,i)=>({id:"old"+i,category:"user",text:text.slice(0,240)}));}catch(e){return [];}}
+function saveMemory(items){try{localStorage.setItem(MEMORY_KEY,JSON.stringify(items).slice(0,12000));}catch(e){}}
+function loadMemory(){return ["user","jokes","threads"].map(c=>{const a=getMemoryItems().filter(x=>x.category===c);return a.length?MEMORY_CATEGORIES[c]+":\\n"+a.map(x=>"• "+x.text).join("\\n"):"";}).filter(Boolean).join("\\n\\n");}
+function renderMemory(){const list=$("memoryList");if(!list)return;list.innerHTML="";const all=getMemoryItems();["user","jokes","threads"].forEach(c=>{const sec=document.createElement("section");sec.className="memory-category";const h=document.createElement("b");h.textContent=MEMORY_CATEGORIES[c];sec.append(h);const rows=all.filter(x=>x.category===c);if(!rows.length){const p=document.createElement("p");p.className="memory-empty";p.textContent="Пока пусто";sec.append(p);}rows.forEach(item=>{const row=document.createElement("div");row.className="memory-entry";const t=document.createElement("span");t.textContent=item.text;const actions=document.createElement("div");actions.className="memory-entry-actions";const edit=document.createElement("button");edit.textContent="Изменить";edit.onclick=()=>{const v=prompt("Измени заметку:",item.text);if(v===null)return;const clean=v.trim().slice(0,240);if(clean){saveMemory(getMemoryItems().map(x=>x.id===item.id?{...x,text:clean}:x));renderMemory();}};const del=document.createElement("button");del.textContent="Удалить";del.onclick=()=>{if(confirm("Удалить заметку?")){saveMemory(getMemoryItems().filter(x=>x.id!==item.id));renderMemory();}};actions.append(edit,del);row.append(t,actions);sec.append(row);});list.append(sec);});}
+function appendMemory(note,category="user"){const text=note.replace(/\\s+/g," ").trim().slice(0,240);if(!text||!MEMORY_CATEGORIES[category])return false;const a=getMemoryItems();if(a.some(x=>x.category===category&&x.text.toLowerCase()===text.toLowerCase()))return false;a.push({id:"m"+Date.now().toString(36)+Math.random().toString(36).slice(2,6),category,text});saveMemory(a);renderMemory();if($("memoryHint"))$("memoryHint").textContent="Новая заметка сохранена локально.";return true;}
+$("addMemoryNote").onclick=()=>{const input=$("memoryNewNote");if(appendMemory(input.value,$("memoryCategory").value)){input.value="";$("memoryHint").textContent="Добавил заметку в память.";}else $("memoryHint").textContent="Заметка пустая или уже есть.";};
+$("memoryNewNote").addEventListener("keydown",e=>{if(e.key==="Enter")$("addMemoryNote").click();});renderMemory();
+function addMemorySuggestion(row,note,category="user"){
   const box=document.createElement("div");
-  box.className="memory-suggestion";
+  box.className="memory-suggestion";box.dataset.category=category;
   const label=document.createElement("span");
   label.textContent="Могу запомнить: "+note;
   const actions=document.createElement("div");
   actions.className="memory-actions";
   const yes=document.createElement("button");
   yes.type="button"; yes.textContent="Запомнить";
-  yes.onclick=()=>{appendMemory(note);box.textContent="Запомнил.";};
+  yes.onclick=()=>{appendMemory(note,box.dataset.category||"user");box.textContent="Запомнил.";};
   const no=document.createElement("button");
   no.type="button"; no.textContent="Не надо";
   no.onclick=()=>box.remove();
@@ -125,10 +121,6 @@ function detectModeCommand(text){
   if(casual.test(value))return {enabled:false,rest:text.replace(casual,"").trim()};
   return null;
 }
-const memoryInput = $("memoryInput");
-if(memoryInput) memoryInput.value = loadMemory();
-const saveMemoryBtn = $("saveMemory");
-if(saveMemoryBtn) saveMemoryBtn.onclick = () => { const value = memoryInput.value.trim(); saveMemory(value); $("memoryHint").textContent = value ? "Сохранил. Кирилл будет учитывать эти заметки в новых ответах." : "Память очищена."; };
 $("nameInput").value = settings.name;
 $("promptInput").value = settings.prompt || DEFAULT_PROMPT;
 $("rateRange").value = settings.rate;
@@ -202,12 +194,8 @@ async function askAI(userText, proactive=false){
     }
     const rememberMatch = userText.match(/^(?:запомни|сохрани в память)[: ,—-]*([\s\S]{2,500})$/i);
     if(rememberMatch){
-      const oldMemory = loadMemory().trim();
       const note = rememberMatch[1].trim();
-      if(!oldMemory.toLowerCase().includes(note.toLowerCase())){
-        saveMemory((oldMemory ? oldMemory + "\n" : "") + "• " + note);
-        if(memoryInput) memoryInput.value = loadMemory();
-      }
+      appendMemory(note,"user");
       const confirmation = "Запомнил. Это сохранено локально на этом компьютере.";
       history.push({role:"assistant",content:confirmation});saveHistory();
       addMessage("assistant",confirmation);
@@ -290,21 +278,22 @@ async function askAI(userText, proactive=false){
     }
     if(streamBuffer.trim())consumeLine(streamBuffer);
     let answer=streamedText.trim();
-    const memoryCandidateMatch = answer.match(/\[\[REMEMBER:\s*([\s\S]{2,180}?)\]\]/i);
+    const memoryCandidateMatch = answer.match(/\[\[REMEMBER:\s*(?:\[(Пользователь|Наши приколы|Незаконченные темы)\]\s*)?([\s\S]{2,180}?)\]\]/i);
     const openUrlMatch = answer.match(/\[\[OPEN_URL:\s*(https?:\/\/[^\s\]]{4,500})\s*\]\]/i);
     const launchMatch = answer.match(/\[\[LAUNCH_APP:\s*(calculator|notepad|explorer)\s*\]\]/i);
     const launchApp = launchMatch ? launchMatch[1].toLowerCase() : "";
     if(launchMatch) answer=answer.replace(launchMatch[0],"").trim();
     const openUrlCandidate = openUrlMatch ? openUrlMatch[1].replace(/[),.]+$/g,"") : "";
     if(openUrlMatch) answer=answer.replace(openUrlMatch[0],"").trim();
-    const memoryCandidate = memoryCandidateMatch ? memoryCandidateMatch[1].replace(/[\r\n]+/g," ").trim() : "";
+    const memoryCategory = memoryCandidateMatch ? ({"пользователь":"user","наши приколы":"jokes","незаконченные темы":"threads"}[(memoryCandidateMatch[1]||"").toLowerCase()]||"user") : "user";
+    const memoryCandidate = memoryCandidateMatch ? (memoryCandidateMatch[2]||memoryCandidateMatch[1]).replace(/[\r\n]+/g," ").trim() : "";
     if(memoryCandidate) answer = answer.replace(memoryCandidateMatch[0],"").trim();
     if (!answer) throw new Error("Модель вернула пустой ответ. Попробуй ещё раз или проверь, не зависла ли Ollama.");
     if(proactive && (answer==="[SKIP]" || answer.includes("[SKIP]"))){if(streamingRow)streamingRow.remove();return;}
     history.push({role:"assistant",content:answer});saveHistory();
     const answerRow = streamingRow || addMessage("assistant",answer);
     answerRow.querySelector(".bubble p").textContent=answer;
-    if(memoryCandidate && !loadMemory().toLowerCase().includes(memoryCandidate.toLowerCase())) addMemorySuggestion(answerRow,memoryCandidate);
+    if(memoryCandidate && !getMemoryItems().some(x=>x.text.toLowerCase()===memoryCandidate.toLowerCase())) addMemorySuggestion(answerRow,memoryCandidate,memoryCategory);
     if(openUrlCandidate){try{const parsed=new URL(openUrlCandidate);if(["http:","https:"].includes(parsed.protocol)){const box=document.createElement("div");box.className="memory-suggestion";const label=document.createElement("span");label.textContent="Кирилл предлагает открыть сайт: "+parsed.hostname;const action=document.createElement("button");action.type="button";action.textContent="Открыть сайт";action.onclick=()=>window.open(parsed.href,"_blank","noopener,noreferrer");box.append(label,action);answerRow.querySelector(".bubble").append(box);}}catch(e){}}
     if(launchApp){const labels={calculator:"Калькулятор",notepad:"Блокнот",explorer:"Проводник"};const box=document.createElement("div");box.className="memory-suggestion";const label=document.createElement("span");label.textContent="Запустить "+labels[launchApp]+"?";const action=document.createElement("button");action.type="button";action.textContent="Запустить";action.onclick=async()=>{action.disabled=true;try{const res=await fetch("/api/action",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:launchApp})});const data=await res.json();label.textContent=res.ok?labels[launchApp]+" запущен.":(data.error||"Не удалось запустить.");}catch(e){label.textContent="Локальный сервер недоступен.";}finally{action.remove();}};box.append(label,action);answerRow.querySelector(".bubble").append(box);}
     if(lastSearchResults.length){
