@@ -177,6 +177,51 @@ let lastInteraction = Date.now();
 let proactiveBusy = false;
 let lastProactiveText = "";
 let proactiveAlreadySpoke = false;
+let screenStream = null;
+let screenVideo = null;
+const screenShareButton = $("screenShareBtn");
+const screenShareStatus = $("screenShareStatus");
+function updateScreenShareUI(){
+  if(!screenShareButton)return;
+  const active=!!screenStream;
+  screenShareButton.textContent=active?"■ Остановить показ экрана":"▣ Показать экран";
+  screenShareButton.classList.toggle("screen-on",active);
+  screenShareStatus.textContent=active?"Экран подключён · снимок отправится вместе со следующим сообщением":"Экран не подключён";
+}
+async function toggleScreenShare(){
+  if(screenStream){stopScreenShare();return;}
+  if(!navigator.mediaDevices?.getDisplayMedia){screenShareStatus.textContent="Браузер не поддерживает захват экрана. Открой через Edge или Chrome.";return;}
+  if(!(settings.model||"").startsWith("qwen3.5")){screenShareStatus.textContent="Для анализа изображений выбери Qwen3.5 9B в настройках.";return;}
+  try{
+    screenStream=await navigator.mediaDevices.getDisplayMedia({video:{frameRate:5},audio:false});
+    screenVideo=document.createElement("video");
+    screenVideo.muted=true;screenVideo.playsInline=true;screenVideo.srcObject=screenStream;
+    await screenVideo.play();
+    screenStream.getVideoTracks()[0].addEventListener("ended",stopScreenShare,{once:true});
+    updateScreenShareUI();
+  }catch(error){
+    screenStream=null;screenVideo=null;
+    screenShareStatus.textContent=error.name==="NotAllowedError"?"Доступ к экрану не разрешён. Нажми кнопку и выбери окно или экран.":"Не удалось подключить экран: "+error.message;
+    updateScreenShareUI();
+  }
+}
+function stopScreenShare(){
+  if(screenStream)screenStream.getTracks().forEach(track=>track.stop());
+  screenStream=null;
+  if(screenVideo){screenVideo.pause();screenVideo.srcObject=null;screenVideo=null;}
+  updateScreenShareUI();
+}
+async function captureScreenImage(){
+  if(!screenStream||!screenVideo||!screenVideo.videoWidth)return null;
+  const scale=Math.min(1,1280/screenVideo.videoWidth);
+  const canvas=document.createElement("canvas");
+  canvas.width=Math.round(screenVideo.videoWidth*scale);
+  canvas.height=Math.round(screenVideo.videoHeight*scale);
+  canvas.getContext("2d").drawImage(screenVideo,0,0,canvas.width,canvas.height);
+  return canvas.toDataURL("image/jpeg",0.78).split(",")[1];
+}
+if(screenShareButton)screenShareButton.addEventListener("click",toggleScreenShare);
+updateScreenShareUI();
 const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
 
 function touchActivity(){
@@ -242,6 +287,18 @@ async function askAI(userText, proactive=false){
       messages.push({role:"user",content:"Ты в голосовом разговоре с другом. Уже несколько минут нет новых реплик. Если есть естественный повод, коротко подхвати недавнюю тему, вспомни уместный незаконченный разговор или брось живое наблюдение. Не говори про таймер, молчание или то, что тебя попросили проявить инициативу. Не вымучивай вопрос и не начинай разговор просто ради заполнения паузы. Если сказать нечего — ответь ровно [SKIP]."});
     } else {
       messages.push(...history.slice(-12));
+      if(screenStream){
+        if((settings.model||"").startsWith("qwen3.5")){
+          const screenImage=await captureScreenImage();
+          if(screenImage){
+            messages[messages.length-1].images=[screenImage];
+            messages.splice(1,0,{role:"system",content:"Пользователь поделился экраном. Изображение приложено к последнему сообщению. Описывай только то, что действительно видно на снимке; если текст мелкий или часть интерфейса неразборчива, скажи об этом. Это один снимок, а не непрерывное наблюдение."});
+            if(screenShareStatus)screenShareStatus.textContent="Снимок экрана отправлен Кириллу · показ остаётся включён";
+          }
+        }else{
+          messages.splice(1,0,{role:"system",content:"Пользователь включил показ экрана, но выбранная модель не поддерживает анализ изображений. Попроси выбрать Qwen3.5 9B."});
+        }
+      }
     }
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 180000);
