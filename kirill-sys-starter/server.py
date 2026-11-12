@@ -35,7 +35,7 @@ class DuckParser(HTMLParser):
             self.results.append(self.current)
             self.current = None
         elif tag in ("a", "div", "td") and self.capture == "snippet" and self.current:
-            self.current["snippet"] = re.sub(r"\\s+", " ", self.buffer).strip()
+            self.current["snippet"] = re.sub(r"\s+", " ", self.buffer).strip()
             self.capture = None
 
 class Handler(SimpleHTTPRequestHandler):
