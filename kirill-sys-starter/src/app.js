@@ -40,7 +40,7 @@ const PREVIOUS_CURRENT_DEFAULT_PROMPT = `Ты Кирилл — приятель 
 Не используй канцелярит, обращение на «вы» и шаблонное «чем могу помочь». Не предлагай помощь автоматически.
 Обычно отвечай кратко и по делу, как знакомый в личной переписке. На серьёзные темы отвечай спокойно.
 Не выдумывай факты о реальном мире или о себе.`;
-const defaults = {name:"Кирилл", prompt:DEFAULT_PROMPT, voice:"", rate:"1"};
+const defaults = {name:"Кирилл", prompt:DEFAULT_PROMPT, voice:"", rate:"1", model:"qwen3.5:9b"};
 const CORE_STYLE_RULES = `ПРАВИЛА ОБЩЕНИЯ:
 — Ты собеседник и кореш, а не преподаватель. Говори на равных, без назидательного тона и без объяснений «с нуля», если их не просили.
 — Не пересказывай запрос перед ответом. Не пиши вступления вроде «Давай разберёмся», «Если речь о…», «Понимаю, ты имеешь в виду…». Сразу отвечай или естественно реагируй.
@@ -113,6 +113,7 @@ if(saveMemoryBtn) saveMemoryBtn.onclick = () => { const value = memoryInput.valu
 $("nameInput").value = settings.name;
 $("promptInput").value = settings.prompt || DEFAULT_PROMPT;
 $("rateRange").value = settings.rate;
+$("modelSelect").value=settings.model||"qwen3.5:9b";
 $("heroName").textContent = settings.name;
 $("rateValue").textContent = Number(settings.rate).toFixed(2)+"×";
 function updateName(){ $("heroName").textContent = settings.name; document.title = settings.name+" — Кирилл Сыс"; }
@@ -147,7 +148,7 @@ $("resetPrompt").onclick=()=>{
   $("promptHint").textContent="Стандартный характер кореша загружен. Нажми «Сохранить настройки», чтобы сохранить его.";
   $("promptInput").focus();
 };
-$("saveSettings").onclick=()=>{settings.name=$("nameInput").value.trim()||"Кирилл";settings.prompt=$("promptInput").value.trim()||defaults.prompt;settings.rate=$("rateRange").value;localStorage.setItem("ks-settings",JSON.stringify(settings));updateName();$("promptHint").textContent="Настройки сохранены. Базовые правила характера Кирилла также применяются.";addMessage("assistant","Сохранил. Ну всё, возвращаюсь в нормальный режим кореша.");};
+$("saveSettings").onclick=()=>{settings.name=$("nameInput").value.trim()||"Кирилл";settings.prompt=$("promptInput").value.trim()||defaults.prompt;settings.rate=$("rateRange").value;settings.model=$("modelSelect").value||"qwen3.5:9b";localStorage.setItem("ks-settings",JSON.stringify(settings));updateName();$("promptHint").textContent="Настройки сохранены. Базовые правила характера Кирилла также применяются.";addMessage("assistant","Сохранил. Ну всё, возвращаюсь в нормальный режим кореша.");};
 $("settingsNav").onclick=()=>{$("settingsPanel").scrollIntoView({behavior:"smooth",block:"center"});$("settingsPanel").style.borderColor="#9860e8";setTimeout(()=>$("settingsPanel").style.borderColor="",900);};
 $("clearChat").onclick=()=>{history=[];saveHistory();$("messages").innerHTML="";addMessage("assistant","Новый разговор начат. Ну что, чем займёмся?");};
 let voiceMode = false;
@@ -163,6 +164,7 @@ function touchActivity(){
 }
 async function askAI(userText, proactive=false){
   const btn=$("sendBtn");
+  let streamingRow=null;
   if(!proactive){
     history.push({role:"user",content:userText});
     saveHistory();
@@ -217,8 +219,8 @@ async function askAI(userText, proactive=false){
         headers: {"Content-Type": "application/json"},
         signal: controller.signal,
         body: JSON.stringify({
-          model: "qwen3.5:9b",
-          stream: false,
+          model: settings.model || "qwen3.5:9b",
+          stream: true,
           think: false,
           keep_alive: "5m",
           options: {num_ctx: 4096, num_predict: 120, temperature: 0.85, top_p: 0.9, repeat_penalty: 1.12},
@@ -232,8 +234,30 @@ async function askAI(userText, proactive=false){
       const detail = await response.text().catch(() => "");
       throw new Error("Ollama: HTTP " + response.status + (detail ? " · " + detail.slice(0, 180) : ""));
     }
-    const data = await response.json();
-    let answer = (data.message?.content || data.response || "").trim();
+    const reader=response.body.getReader();
+    const decoder=new TextDecoder();
+    let streamBuffer="", streamedText="";
+    const consumeLine=(line)=>{
+      if(!line.trim())return;
+      let chunk;try{chunk=JSON.parse(line);}catch(e){return;}
+      const piece=chunk.message?.content || "";
+      if(piece){
+        streamedText+=piece;
+        if(!streamingRow) streamingRow=addMessage("assistant","");
+        streamingRow.querySelector(".bubble p").textContent=streamedText;
+        $("messages").scrollTop=$("messages").scrollHeight;
+      }
+      if(chunk.error) throw new Error(chunk.error);
+    };
+    while(true){
+      const part=await reader.read();
+      streamBuffer+=decoder.decode(part.value||new Uint8Array(),{stream:!part.done});
+      const lines=streamBuffer.split("\n");streamBuffer=lines.pop()||"";
+      lines.forEach(consumeLine);
+      if(part.done)break;
+    }
+    if(streamBuffer.trim())consumeLine(streamBuffer);
+    let answer=streamedText.trim();
     const memoryCandidateMatch = answer.match(/\[\[REMEMBER:\s*([\s\S]{2,180}?)\]\]/i);
     const openUrlMatch = answer.match(/\[\[OPEN_URL:\s*(https?:\/\/[^\s\]]{4,500})\s*\]\]/i);
     const launchMatch = answer.match(/\[\[LAUNCH_APP:\s*(calculator|notepad|explorer)\s*\]\]/i);
@@ -244,9 +268,10 @@ async function askAI(userText, proactive=false){
     const memoryCandidate = memoryCandidateMatch ? memoryCandidateMatch[1].replace(/[\r\n]+/g," ").trim() : "";
     if(memoryCandidate) answer = answer.replace(memoryCandidateMatch[0],"").trim();
     if (!answer) throw new Error("Модель вернула пустой ответ. Попробуй ещё раз или проверь, не зависла ли Ollama.");
-    if(proactive && (answer==="[SKIP]" || answer.includes("[SKIP]")))return;
+    if(proactive && (answer==="[SKIP]" || answer.includes("[SKIP]"))){if(streamingRow)streamingRow.remove();return;}
     history.push({role:"assistant",content:answer});saveHistory();
-    const answerRow = addMessage("assistant",answer);
+    const answerRow = streamingRow || addMessage("assistant",answer);
+    answerRow.querySelector(".bubble p").textContent=answer;
     if(memoryCandidate && !loadMemory().toLowerCase().includes(memoryCandidate.toLowerCase())) addMemorySuggestion(answerRow,memoryCandidate);
     if(openUrlCandidate){try{const parsed=new URL(openUrlCandidate);if(["http:","https:"].includes(parsed.protocol)){const box=document.createElement("div");box.className="memory-suggestion";const label=document.createElement("span");label.textContent="Кирилл предлагает открыть сайт: "+parsed.hostname;const action=document.createElement("button");action.type="button";action.textContent="Открыть сайт";action.onclick=()=>window.open(parsed.href,"_blank","noopener,noreferrer");box.append(label,action);answerRow.querySelector(".bubble").append(box);}}catch(e){}}
     if(launchApp){const labels={calculator:"Калькулятор",notepad:"Блокнот",explorer:"Проводник"};const box=document.createElement("div");box.className="memory-suggestion";const label=document.createElement("span");label.textContent="Запустить "+labels[launchApp]+"?";const action=document.createElement("button");action.type="button";action.textContent="Запустить";action.onclick=async()=>{action.disabled=true;try{const res=await fetch("/api/action",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:launchApp})});const data=await res.json();label.textContent=res.ok?labels[launchApp]+" запущен.":(data.error||"Не удалось запустить.");}catch(e){label.textContent="Локальный сервер недоступен.";}finally{action.remove();}};box.append(label,action);answerRow.querySelector(".bubble").append(box);}
@@ -266,7 +291,8 @@ async function askAI(userText, proactive=false){
     speak(answer);
     touchActivity();
   }catch(err){
-    if(!proactive)addMessage("assistant","Не могу подключиться к локальному ИИ. Проверь Ollama и модель qwen3.5:9b. "+err.message);
+    if(streamingRow)streamingRow.remove();
+    if(!proactive)addMessage("assistant","Не могу подключиться к локальному ИИ. Проверь Ollama и выбранную модель. "+err.message);
   }finally{
     if(!proactive){btn.disabled=false;btn.textContent="➤";}
     proactiveBusy=false;
@@ -333,14 +359,21 @@ $("clearChat").onclick=()=>{history=[];saveHistory();$("messages").innerHTML="";
 async function checkOllama(){
   const status = $("connection");
   const modelLabel = $("modelLabel");
-  const modelName = "qwen3.5:9b";
-  modelLabel.textContent = "Модель: Qwen3.5 9B";
+  const modelSelect=$("modelSelect");
+  const modelName=settings.model||"qwen3.5:9b";
+  modelLabel.textContent = "Модель: "+modelName;
   try {
     const response = await fetch("http://localhost:11434/api/tags");
     if (!response.ok) throw new Error("HTTP " + response.status);
     const data = await response.json();
-    const installed = (data.models || []).some(model => model.name === modelName);
-    status.textContent = installed ? "Ollama подключена · Qwen3.5 готова" : "Ollama работает · установи Qwen3.5 9B";
+    const installedModels=(data.models||[]).map(model=>model.name);
+    Array.from(modelSelect.options).forEach(option=>{option.disabled=!installedModels.some(name=>name===option.value||name.startsWith(option.value+":"));});
+    if(!installedModels.some(name=>name===modelName||name.startsWith(modelName+":"))){
+      const fallback=installedModels.find(name=>name.startsWith("qwen3:4b-instruct-2507"))||installedModels.find(name=>name.startsWith("qwen3.5:9b"));
+      if(fallback){settings.model=fallback;modelSelect.value=fallback;}
+    }
+    status.textContent = installedModels.length ? "Ollama подключена · моделей: "+installedModels.length : "Ollama работает · модели не найдены";
+    modelLabel.textContent="Модель: "+(settings.model||modelName);
   } catch (error) {
     status.textContent = "Ollama не найдена · запусти её";
   }
