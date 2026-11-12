@@ -176,10 +176,12 @@ let idleTimer = null;
 let lastInteraction = Date.now();
 let proactiveBusy = false;
 let lastProactiveText = "";
+let proactiveAlreadySpoke = false;
 const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
 
 function touchActivity(){
   lastInteraction = Date.now();
+  proactiveAlreadySpoke = false;
   scheduleProactive();
 }
 async function askAI(userText, proactive=false){
@@ -301,7 +303,7 @@ async function askAI(userText, proactive=false){
     if(memoryCandidate) answer = answer.replace(memoryCandidateMatch[0],"").trim();
     if (!answer) throw new Error("Модель вернула пустой ответ. Попробуй ещё раз или проверь, не зависла ли Ollama.");
     if(proactive && (answer==="[SKIP]" || answer.includes("[SKIP]"))){if(streamingRow)streamingRow.remove();return;}
-    if(proactive) lastProactiveText=answer.slice(0,220);
+    if(proactive){lastProactiveText=answer.slice(0,220);proactiveAlreadySpoke=true;}
     history.push({role:"assistant",content:answer});saveHistory();
     const answerRow = streamingRow || addMessage("assistant",answer);
     answerRow.querySelector(".bubble p").textContent=answer;
@@ -339,7 +341,7 @@ function scheduleProactive(){
   clearTimeout(idleTimer);
   if(!voiceMode)return;
   idleTimer=setTimeout(async()=>{
-    if(!voiceMode || proactiveBusy)return;
+    if(!voiceMode || proactiveBusy || proactiveAlreadySpoke)return;
     if(Date.now()-lastInteraction < 175000 || history.filter(x=>x.role==="user").length < 3){scheduleProactive();return;}
     proactiveBusy=true;
     await askAI("",true);
