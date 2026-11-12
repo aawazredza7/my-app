@@ -175,6 +175,8 @@ let recognition = null;
 let idleTimer = null;
 let lastInteraction = Date.now();
 let proactiveBusy = false;
+let aiRequestQueue = Promise.resolve();
+let aiRequestPending = 0;
 let lastProactiveText = "";
 let proactiveAlreadySpoke = false;
 let screenStream = null;
@@ -193,7 +195,7 @@ async function toggleScreenShare(){
   if(!navigator.mediaDevices?.getDisplayMedia){screenShareStatus.textContent="Браузер не поддерживает захват экрана. Открой через Edge или Chrome.";return;}
   if(!(settings.model||"").startsWith("qwen3.5")){screenShareStatus.textContent="Для анализа изображений выбери Qwen3.5 9B в настройках.";return;}
   try{
-    screenStream=await navigator.mediaDevices.getDisplayMedia({video:{frameRate:5},audio:false});
+    screenStream=await navigator.mediaDevices.getDisplayMedia({video:{frameRate:1},audio:false});
     screenVideo=document.createElement("video");
     screenVideo.muted=true;screenVideo.playsInline=true;screenVideo.srcObject=screenStream;
     await screenVideo.play();
@@ -213,12 +215,12 @@ function stopScreenShare(){
 }
 async function captureScreenImage(){
   if(!screenStream||!screenVideo||!screenVideo.videoWidth)return null;
-  const scale=Math.min(1,1280/screenVideo.videoWidth);
+  const scale=Math.min(1,1024/screenVideo.videoWidth);
   const canvas=document.createElement("canvas");
   canvas.width=Math.round(screenVideo.videoWidth*scale);
   canvas.height=Math.round(screenVideo.videoHeight*scale);
   canvas.getContext("2d").drawImage(screenVideo,0,0,canvas.width,canvas.height);
-  return canvas.toDataURL("image/jpeg",0.78).split(",")[1];
+  return canvas.toDataURL("image/jpeg",0.72).split(",")[1];
 }
 if(screenShareButton)screenShareButton.addEventListener("click",toggleScreenShare);
 updateScreenShareUI();
@@ -229,7 +231,15 @@ function touchActivity(){
   proactiveAlreadySpoke = false;
   scheduleProactive();
 }
-async function askAI(userText, proactive=false){
+function askAI(userText, proactive=false){
+  if(proactive && aiRequestPending>0)return Promise.resolve();
+  aiRequestPending++;
+  const run=()=>runAIRequest(userText,proactive);
+  const task=aiRequestQueue.then(run,run);
+  aiRequestQueue=task.catch(()=>{});
+  return task.finally(()=>{aiRequestPending=Math.max(0,aiRequestPending-1);});
+}
+async function runAIRequest(userText, proactive=false){
   const btn=$("sendBtn");
   let streamingRow=null;
   if(!proactive){
@@ -280,7 +290,7 @@ async function askAI(userText, proactive=false){
       }
     }
     if(proactive){
-      messages.push(...history.slice(-12));
+      messages.push(...history.slice(-10));
       const openThreads = getMemoryItems().filter(x=>x.category==="threads").map(x=>x.text).slice(-5);
       if(openThreads.length) messages.push({role:"system",content:"В памяти есть незаконченные темы. Можно естественно подхватить одну из них, только если она действительно подходит к текущему разговору; не превращай это в отчёт о памяти и не дави на пользователя. Темы: "+openThreads.join(" | ")});
       if(lastProactiveText) messages.push({role:"system",content:"Твоя последняя самостоятельная реплика была: "+lastProactiveText+". Не повторяй её и не начинай снова ту же тему."});
@@ -312,8 +322,8 @@ async function askAI(userText, proactive=false){
           model: settings.model || "qwen3.5:9b",
           stream: true,
           think: false,
-          keep_alive: "5m",
-          options: {num_ctx: 4096, num_predict: 120, temperature: 0.85, top_p: 0.9, repeat_penalty: 1.12},
+          keep_alive: "2m",
+          options: {num_ctx: 3072, num_predict: 120, temperature: 0.85, top_p: 0.9, repeat_penalty: 1.12},
           messages
         })
       });
