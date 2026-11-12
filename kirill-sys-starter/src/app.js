@@ -106,7 +106,7 @@ function buildSystemPrompt(){
   return custom + "\n\n" + CORE_STYLE_RULES + modeRules + memoryBlock + memoryBehavior;
 }
 const savedSettings = JSON.parse(localStorage.getItem("ks-settings") || "{}");
-if (savedSettings.prompt === LEGACY_DEFAULT_PROMPT || savedSettings.prompt === PREVIOUS_DEFAULT_PROMPT || savedSettings.prompt === PREVIOUS_CURRENT_DEFAULT_PROMPT) savedSettings.prompt = DEFAULT_PROMPT;
+if (savedSettings.prompt === LEGACY_DEFAULT_PROMPT || savedSettings.prompt === PREVIOUS_DEFAULT_PROMPT || savedSettings.prompt === PREVIOUS_CURRENT_DEFAULT_PROMPT || (savedSettings.prompt || "").startsWith("Ты Кирилл — свой человек, приятель пользователя") && savedSettings.prompt.includes("Не выдумывай факты, названия, предметы")) savedSettings.prompt = DEFAULT_PROMPT;
 let settings = {...defaults, ...savedSettings};
 let history = loadHistory();
 let lastSearchResults = [];
