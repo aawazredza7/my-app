@@ -232,7 +232,7 @@ function touchActivity(){
   scheduleProactive();
 }
 function askAI(userText, proactive=false){
-  if(proactive && aiRequestPending>0)return Promise.resolve();
+  if(proactive && aiRequestPending>0){proactiveBusy=false;return Promise.resolve();}
   aiRequestPending++;
   const run=()=>runAIRequest(userText,proactive);
   const task=aiRequestQueue.then(run,run);
