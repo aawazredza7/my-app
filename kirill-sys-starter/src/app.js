@@ -324,7 +324,7 @@ $("sendBtn").onclick=send;
 $("messageInput").addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send();}});
 $("testVoice").onclick=()=>speak("ЙО, БРАТ! Проверка связи. Если ты это слышишь, значит голос работает. АХАХА.");
 if($("stopVoice"))$("stopVoice").onclick=stopSpeaking;
-$("clearChat").onclick=()=>{history=[];$("messages").innerHTML="";addMessage("assistant","Ну всё, новая катка. Что мутим?");touchActivity();};
+$("clearChat").onclick=()=>{history=[];saveHistory();$("messages").innerHTML="";addMessage("assistant","Ну всё, новая катка. Что мутим?");touchActivity();};
 async function checkOllama(){
   const status = $("connection");
   const modelLabel = $("modelLabel");
