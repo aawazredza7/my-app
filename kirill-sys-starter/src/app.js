@@ -296,7 +296,7 @@ async function runAIRequest(userText, proactive=false){
       if(lastProactiveText) messages.push({role:"system",content:"Твоя последняя самостоятельная реплика была: "+lastProactiveText+". Не повторяй её и не начинай снова ту же тему."});
       messages.push({role:"user",content:"Ты в голосовом разговоре с другом. Уже несколько минут нет новых реплик. Если есть естественный повод, коротко подхвати недавнюю тему, вспомни уместный незаконченный разговор или брось живое наблюдение. Не говори про таймер, молчание или то, что тебя попросили проявить инициативу. Не вымучивай вопрос и не начинай разговор просто ради заполнения паузы. Если сказать нечего — ответь ровно [SKIP]."});
     } else {
-      messages.push(...history.slice(-12));
+      messages.push(...history.slice(-10));
       if(screenStream){
         if((settings.model||"").startsWith("qwen3.5")){
           const screenImage=await captureScreenImage();
