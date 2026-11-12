@@ -38,3 +38,8 @@ button{cursor:pointer;border:0}.primary,.secondary,.save-btn{border-radius:10px;
 #stopVoice:hover{background:#444}
 
 #modeLabel{color:#c5b4e8;font-weight:700}
+
+
+/* Categorized memory manager */
+.memory-editor{margin:0 18px}.memory-add{display:grid;grid-template-columns:1fr 1.2fr auto;gap:6px}.memory-add select,.memory-add input{width:100%;margin:0;min-width:0}.memory-add button,.memory-entry-actions button{border:1px solid #4d4d4d;border-radius:8px;background:#353535;color:#eee;padding:8px 9px;font-size:10px}.memory-add button:hover,.memory-entry-actions button:hover{background:#484848}.memory-list{display:flex;flex-direction:column;gap:10px;margin-top:12px}.memory-category{border:1px solid #3b3b3b;border-radius:9px;padding:10px;background:#252525}.memory-category>b{font-size:10px;color:#d2c5e5}.memory-empty{font-size:10px;color:#777;margin:7px 0 0}.memory-entry{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;padding:8px 0;border-top:1px solid #383838;font-size:10px;color:#ddd;line-height:1.5}.memory-entry:first-of-type{margin-top:7px}.memory-entry>span{flex:1;min-width:0;overflow-wrap:anywhere}.memory-entry-actions{display:flex;gap:5px;flex-shrink:0}.memory-entry-actions button{padding:5px 7px;font-size:9px}
+@media(max-width:560px){.memory-add{grid-template-columns:1fr}.memory-add select,.memory-add input,.memory-add button{min-height:36px}}
