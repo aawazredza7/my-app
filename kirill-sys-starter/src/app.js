@@ -194,11 +194,15 @@ async function askAI(userText, proactive=false){
       throw new Error("Ollama: HTTP " + response.status + (detail ? " · " + detail.slice(0, 180) : ""));
     }
     const data = await response.json();
-    const answer = (data.message?.content || data.response || "").trim();
+    let answer = (data.message?.content || data.response || "").trim();
+    const memoryCandidateMatch = answer.match(/\[\[REMEMBER:\s*([\s\S]{2,180}?)\]\]/i);
+    const memoryCandidate = memoryCandidateMatch ? memoryCandidateMatch[1].replace(/[\r\n]+/g," ").trim() : "";
+    if(memoryCandidate) answer = answer.replace(memoryCandidateMatch[0],"").trim();
     if (!answer) throw new Error("Модель вернула пустой ответ. Попробуй ещё раз или проверь, не зависла ли Ollama.");
     if(proactive && (answer==="[SKIP]" || answer.includes("[SKIP]")))return;
     history.push({role:"assistant",content:answer});
     const answerRow = addMessage("assistant",answer);
+    if(memoryCandidate && !loadMemory().toLowerCase().includes(memoryCandidate.toLowerCase())) addMemorySuggestion(answerRow,memoryCandidate);
     if(lastSearchResults.length){
       const sourceBox = document.createElement("div");
       sourceBox.className = "search-sources";
