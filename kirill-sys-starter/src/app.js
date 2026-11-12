@@ -119,7 +119,7 @@ function setSeriousMode(enabled){
 }
 function detectModeCommand(text){
   const value=text.trim().toLowerCase();
-  const serious=/^(?:(?:кириль|кирилл)[, ]*)?(?:давай\s+)?(?:сейчас\s+)?(?:серьёзно|серьезно|без\s+шуток|включи\s+серьёзный\s+режим|включи\s+серьезный\s+режим)(?:[!,. ]+|$)/i;
+  const serious=/^(?:(?:кириль|кирилл)[, ]*)?(?:давай\s+)?(?:сейчас\s+)?(?:серьёзно|серьезно|без\s+шуток|включи\s+серьёзный\s+режим|включи\s+серьезный\s+режим)(?:[!,. :]+|$)/i;
   const casual=/^(?:(?:кириль|кирилл)[, ]*)?(?:вернись?\s+в\s+обычный\s+режим|обычный\s+режим|можно\s+шутить|хватит\s+серьёзничать|хватит\s+серьезничать)(?:[!,. ]*|$)/i;
   if(serious.test(value))return {enabled:true,rest:text.replace(serious,"").trim()};
   if(casual.test(value))return {enabled:false,rest:text.replace(casual,"").trim()};
