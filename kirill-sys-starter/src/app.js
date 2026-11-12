@@ -98,7 +98,7 @@ function buildSystemPrompt(){
   const custom = (settings.prompt || DEFAULT_PROMPT).trim();
   const memory = loadMemory().trim();
   const memoryBlock = memory ? "\n\nПАМЯТЬ О ПОЛЬЗОВАТЕЛЕ (используй только когда уместно; не выдумывай дополнений):\n" + memory : "";
-  const memoryBehavior = "\n\nЕсли пользователь сообщил устойчивый, полезный для будущих бесед факт о себе, интересах, предпочтениях или текущем проекте, добавь в самый конец ответа маркер [[REMEMBER: краткая заметка от третьего лица]]. Не более одного маркера и до 160 символов. Не добавляй его для случайных/одноразовых сведений, шуток, эмоций, чужих личных данных, паролей, адресов, медицинских, финансовых или иных чувствительных сведений. Не повторяй уже сохранённое. Если запоминать нечего — не добавляй маркер. Маркер будет предложен пользователю и сохранится только после его согласия.\nЕсли пользователь прямо просит открыть сайт или ссылку, можешь в конце ответа добавить [[OPEN_URL: https://...]] с точным безопасным URL. Не добавляй этот маркер без прямой просьбы открыть сайт. Никогда не предлагай запускать команды, программы или скачивать файлы.";
+  const memoryBehavior = "\n\nЕсли пользователь сообщил устойчивый, полезный для будущих бесед факт о себе, интересах, предпочтениях или текущем проекте, добавь в самый конец ответа маркер [[REMEMBER: краткая заметка от третьего лица]]. Не более одного маркера и до 160 символов. Не добавляй его для случайных/одноразовых сведений, шуток, эмоций, чужих личных данных, паролей, адресов, медицинских, финансовых или иных чувствительных сведений. Не повторяй уже сохранённое. Если запоминать нечего — не добавляй маркер. Маркер будет предложен пользователю и сохранится только после его согласия.\nЕсли пользователь прямо просит открыть сайт или ссылку, можешь в конце ответа добавить [[OPEN_URL: https://...]] с точным безопасным URL. Не добавляй этот маркер без прямой просьбы открыть сайт. Если пользователь прямо просит запустить калькулятор, Блокнот или Проводник Windows, добавь маркер [[LAUNCH_APP: calculator]], [[LAUNCH_APP: notepad]] или [[LAUNCH_APP: explorer]] соответственно. Не используй маркер без прямой просьбы. Другие программы и произвольные команды запускать нельзя.";
   return custom + "\n\n" + CORE_STYLE_RULES + memoryBlock + memoryBehavior;
 }
 const savedSettings = JSON.parse(localStorage.getItem("ks-settings") || "{}");
@@ -236,6 +236,9 @@ async function askAI(userText, proactive=false){
     let answer = (data.message?.content || data.response || "").trim();
     const memoryCandidateMatch = answer.match(/\[\[REMEMBER:\s*([\s\S]{2,180}?)\]\]/i);
     const openUrlMatch = answer.match(/\[\[OPEN_URL:\s*(https?:\/\/[^\s\]]{4,500})\s*\]\]/i);
+    const launchMatch = answer.match(/\[\[LAUNCH_APP:\s*(calculator|notepad|explorer)\s*\]\]/i);
+    const launchApp = launchMatch ? launchMatch[1].toLowerCase() : "";
+    if(launchMatch) answer=answer.replace(launchMatch[0],"").trim();
     const openUrlCandidate = openUrlMatch ? openUrlMatch[1].replace(/[),.]+$/g,"") : "";
     if(openUrlMatch) answer=answer.replace(openUrlMatch[0],"").trim();
     const memoryCandidate = memoryCandidateMatch ? memoryCandidateMatch[1].replace(/[\r\n]+/g," ").trim() : "";
@@ -246,6 +249,7 @@ async function askAI(userText, proactive=false){
     const answerRow = addMessage("assistant",answer);
     if(memoryCandidate && !loadMemory().toLowerCase().includes(memoryCandidate.toLowerCase())) addMemorySuggestion(answerRow,memoryCandidate);
     if(openUrlCandidate){try{const parsed=new URL(openUrlCandidate);if(["http:","https:"].includes(parsed.protocol)){const box=document.createElement("div");box.className="memory-suggestion";const label=document.createElement("span");label.textContent="Кирилл предлагает открыть сайт: "+parsed.hostname;const action=document.createElement("button");action.type="button";action.textContent="Открыть сайт";action.onclick=()=>window.open(parsed.href,"_blank","noopener,noreferrer");box.append(label,action);answerRow.querySelector(".bubble").append(box);}}catch(e){}}
+    if(launchApp){const labels={calculator:"Калькулятор",notepad:"Блокнот",explorer:"Проводник"};const box=document.createElement("div");box.className="memory-suggestion";const label=document.createElement("span");label.textContent="Запустить "+labels[launchApp]+"?";const action=document.createElement("button");action.type="button";action.textContent="Запустить";action.onclick=async()=>{action.disabled=true;try{const res=await fetch("/api/action",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:launchApp})});const data=await res.json();label.textContent=res.ok?labels[launchApp]+" запущен.":(data.error||"Не удалось запустить.");}catch(e){label.textContent="Локальный сервер недоступен.";}finally{action.remove();}};box.append(label,action);answerRow.querySelector(".bubble").append(box);}
     if(lastSearchResults.length){
       const sourceBox = document.createElement("div");
       sourceBox.className = "search-sources";
