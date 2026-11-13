@@ -312,6 +312,8 @@ async function runAIRequest(userText, proactive=false){
     }
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 180000);
+    const requestStartedAt=performance.now();
+    let firstTokenMs=null, ollamaStats=null;
     let response;
     try {
       response = await fetch("http://localhost:11434/api/chat", {
@@ -340,8 +342,19 @@ async function runAIRequest(userText, proactive=false){
     const consumeLine=(line)=>{
       if(!line.trim())return;
       let chunk;try{chunk=JSON.parse(line);}catch(e){return;}
+      if(chunk.done){
+        ollamaStats={
+          promptTokens:chunk.prompt_eval_count,
+          promptMs:chunk.prompt_eval_duration?Math.round(chunk.prompt_eval_duration/1e6):null,
+          generatedTokens:chunk.eval_count,
+          generationMs:chunk.eval_duration?Math.round(chunk.eval_duration/1e6):null,
+          totalMs:chunk.total_duration?Math.round(chunk.total_duration/1e6):null,
+          loadMs:chunk.load_duration?Math.round(chunk.load_duration/1e6):null
+        };
+      }
       const piece=chunk.message?.content || "";
       if(piece){
+        if(firstTokenMs===null)firstTokenMs=Math.round(performance.now()-requestStartedAt);
         streamedText+=piece;
         if(!streamingRow) streamingRow=addMessage("assistant","");
         streamingRow.querySelector(".bubble p").textContent=streamedText;
@@ -389,6 +402,18 @@ async function runAIRequest(userText, proactive=false){
         link.textContent = item.title; sourceBox.append(link);
       });
       answerRow.querySelector(".bubble").append(sourceBox);
+    }
+    if(!proactive){
+      const perf=$("perfStatus");
+      if(perf){
+        const stat=ollamaStats||{};
+        const parts=[];
+        if(firstTokenMs!==null)parts.push("первый токен "+(firstTokenMs/1000).toFixed(1)+"с");
+        if(stat.promptMs!==null)parts.push("вход "+(stat.promptMs/1000).toFixed(1)+"с / "+(stat.promptTokens??"?")+" токенов");
+        if(stat.generationMs!==null)parts.push("генерация "+(stat.generationMs/1000).toFixed(1)+"с / "+(stat.generatedTokens??"?")+" токенов");
+        if(stat.loadMs!==null)parts.push("загрузка "+(stat.loadMs/1000).toFixed(1)+"с");
+        perf.textContent=parts.length?("Диагностика: "+parts.join(" · ")):"Диагностика: Ollama не вернула статистику";
+      }
     }
     speak(answer);
     if(!proactive) touchActivity();
