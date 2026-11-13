@@ -198,7 +198,7 @@ function stopScreenShare(){
   updateScreenShareUI();
 }
 function wantsScreenSnapshot(text){
-  return /(?:экран|скрин(?:шот)?|посмотри|глянь|что\\s+(?:тут|на\\s+экране|происходит)|что\\s+видно|видишь|интерфейс|окно|на\\s+мониторе|ошибк[ауи]?\\s+на\\s+экране)/i.test(text||"");
+  return /(?:экран|скрин(?:шот)?|посмотри|глянь|что\s+(?:тут|на\s+экране|происходит)|что\s+видно|видишь|интерфейс|окно|на\s+мониторе|ошибк[ауи]?\s+на\s+экране)/i.test(text||"");
 }
 async function captureScreenImage(){
   if(!screenStream||!screenVideo||!screenVideo.videoWidth)return null;
