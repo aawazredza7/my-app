@@ -38,15 +38,7 @@ const PREVIOUS_CURRENT_DEFAULT_PROMPT = `Ты Кирилл — приятель 
 Обычно отвечай кратко и по делу, как знакомый в личной переписке. На серьёзные темы отвечай спокойно.
 Не выдумывай факты о реальном мире или о себе.`;
 const defaults = {name:"Кирилл", prompt:DEFAULT_PROMPT, voice:"", rate:"1", model:"qwen3.5:9b"};
-const CORE_STYLE_RULES = `КРАТКИЕ ПРАВИЛА:
-— Общайся на равных, естественно, как кореш из Discord; один характер для всех тем.
-— Обычно 1–2 фразы. Не пересказывай запрос, не лей вступления, не предлагай помощь автоматически.
-— В обычной беседе уместны юмор, абсурд, сарказм, дружеские подколы и мат. Не шути насильно.
-— Не будь учителем или техподдержкой. Можешь спорить; если ошибся — признай и исправь.
-— Не выдавай выдумку за факт. Для реальных игровых советов используй настоящие предметы и механики; шуточные выдумки оставляй очевидному угару.
-— По просьбе «серьёзно» отвечай глубже, проверяй расчёты и допущения, но оставайся Кириллом.
-— Если не уверен или голосовой ввод исказил важное слово, честно скажи или коротко уточни.
-— Не притворяйся, что видишь экран или слышишь пользователя, если соответствующая функция не подключена.`;
+const CORE_STYLE_RULES = `ПРАВИЛА: говори естественно и на равных, обычно 1–2 фразы. Юмор, сарказм и мат — по ситуации, не насильно. Не будь учителем или техподдержкой, не предлагай помощь автоматически. Не выдавай выдумки за факты и игровые механики; если не уверен — уточни. Оставайся Кириллом в любой теме.`;
 
 
 const MEMORY_KEY = "ks-memory";
@@ -91,14 +83,14 @@ function addMemorySuggestion(row,note,category="user"){
   row.querySelector(".bubble").append(box);
 }
 function buildSystemPrompt(){
-  const custom = (settings.prompt || DEFAULT_PROMPT).trim();
-  const memory = loadMemory().trim().slice(0,900);
-  const memoryBlock = memory ? "\n\nОБЩАЯ ПАМЯТЬ КИРИЛЛА (используй естественно, только когда уместно; не выдумывай дополнений):\n" + memory : ""
-  const memoryBehavior = "\n\nПАМЯТЬ: три категории — пользователь, наши повторяющиеся приколы, незаконченные темы. Используй только сохранённые факты, ненавязчиво и по контексту. Не предлагай сохранить случайную шутку или тему без явного повода. Если есть действительно полезная новая заметка, добавь в конец один маркер: [[REMEMBER: [Пользователь] текст]], [[REMEMBER: [Наши приколы] текст]] или [[REMEMBER: [Незаконченные темы] текст]] (до 160 символов). Сохраняется только после подтверждения пользователя. Не записывай чувствительные данные. По прямой просьбе открыть сайт можно добавить [[OPEN_URL: точный URL]], по прямой просьбе запустить калькулятор, Блокнот или Проводник — один маркер [[LAUNCH_APP: calculator]], [[LAUNCH_APP: notepad]] или [[LAUNCH_APP: explorer]]. Без просьбы маркеры действий запрещены.";
-  const modeRules = seriousMode
-    ? "\n\nТЕКУЩИЙ РЕЖИМ: СЕРЬЁЗНЫЙ (включён по просьбе пользователя). Сейчас приоритет — точность и глубина. Разбери задачу внимательно, не пропускай важные шаги, перепроверь арифметику и причинно-следственные связи. Для расчётов укажи исходные данные и допущения; если данных не хватает — спроси или явно обозначь предел точности. Не выдумывай источники, цифры, игровые механики и факты. Юмор сведи к минимуму, но говори по-человечески, оставаясь Кириллом."
-    : "\n\nТЕКУЩИЙ РЕЖИМ: ОБЫЧНЫЙ, ДРУЖЕСКИЙ. Пользователь не просил включать серьёзный режим. Общайся свободно и коротко; можно шутить, импровизировать и иногда нести очевидную смешную чушь ради угара. Если запрос требует конкретной достоверной информации или расчёта, не подменяй факты выдумкой. Серьёзный режим включается только по прямой просьбе пользователя.";
-  return custom + "\n\n" + CORE_STYLE_RULES + modeRules + memoryBlock + memoryBehavior;
+  const custom=(settings.prompt||DEFAULT_PROMPT).trim();
+  const memory=loadMemory().trim().slice(0,600);
+  const memoryBlock=memory?"\nПАМЯТЬ (используй только уместно, не додумывай):\n"+memory:"";
+  const modeRules=seriousMode
+    ?"\nРЕЖИМ СЕРЬЁЗНЫЙ: точность и глубина важнее краткости. Проверяй расчёты, логику и игровые механики; указывай допущения, не выдумывай недостающие данные. Юмор минимален."
+    :"\nРЕЖИМ ОБЫЧНЫЙ: дружеское свободное общение, короткие живые ответы; шути по ситуации. Для реальных фактов, инструкций и игровых советов не выдумывай. Серьёзный режим — только по прямой просьбе.";
+  const memoryBehavior="\nПАМЯТЬ: сохраняй полезные факты, общие приколы и незаконченные темы только маркером [[REMEMBER: [Пользователь] текст]], [[REMEMBER: [Наши приколы] текст]] или [[REMEMBER: [Незаконченные темы] текст]]; сохранение требует подтверждения. Не записывай чувствительные данные. Открытие сайта по прямой просьбе: [[OPEN_URL: точный URL]]. Запуск приложения по прямой просьбе: [[LAUNCH_APP: calculator]], [[LAUNCH_APP: notepad]] или [[LAUNCH_APP: explorer]]. Иначе маркеры действий запрещены.";
+  return custom+"\n"+CORE_STYLE_RULES+modeRules+memoryBlock+memoryBehavior;
 }
 const savedSettings = JSON.parse(localStorage.getItem("ks-settings") || "{}");
 if (savedSettings.prompt === LEGACY_DEFAULT_PROMPT || savedSettings.prompt === PREVIOUS_DEFAULT_PROMPT || savedSettings.prompt === PREVIOUS_CURRENT_DEFAULT_PROMPT || (savedSettings.prompt || "").startsWith("Ты Кирилл — свой человек, приятель пользователя") && savedSettings.prompt.includes("Не выдумывай факты, названия, предметы") || (savedSettings.prompt || "").startsWith("Ты Кирилл — приятель пользователя") && savedSettings.prompt.includes("Не разговаривай как учитель, психолог")) savedSettings.prompt = DEFAULT_PROMPT;
@@ -180,7 +172,7 @@ function updateScreenShareUI(){
   const active=!!screenStream;
   screenShareButton.textContent=active?"■ Остановить показ экрана":"▣ Показать экран";
   screenShareButton.classList.toggle("screen-on",active);
-  screenShareStatus.textContent=active?"Экран подключён · снимок отправится вместе со следующим сообщением":"Экран не подключён";
+  screenShareStatus.textContent=active?"Экран подключён · снимок отправится по запросу":"Экран не подключён";
 }
 async function toggleScreenShare(){
   if(screenStream){stopScreenShare();return;}
@@ -204,6 +196,9 @@ function stopScreenShare(){
   screenStream=null;
   if(screenVideo){screenVideo.pause();screenVideo.srcObject=null;screenVideo=null;}
   updateScreenShareUI();
+}
+function wantsScreenSnapshot(text){
+  return /(?:экран|скрин(?:шот)?|посмотри|глянь|что\\s+(?:тут|на\\s+экране|происходит)|что\\s+видно|видишь|интерфейс|окно|на\\s+мониторе|ошибк[ауи]?\\s+на\\s+экране)/i.test(text||"");
 }
 async function captureScreenImage(){
   if(!screenStream||!screenVideo||!screenVideo.videoWidth)return null;
@@ -282,14 +277,14 @@ async function runAIRequest(userText, proactive=false){
       }
     }
     if(proactive){
-      messages.push(...history.slice(-6));
+      messages.push(...history.slice(-4));
       const openThreads = getMemoryItems().filter(x=>x.category==="threads").map(x=>x.text).slice(-5);
       if(openThreads.length) messages.push({role:"system",content:"В памяти есть незаконченные темы. Можно естественно подхватить одну из них, только если она действительно подходит к текущему разговору; не превращай это в отчёт о памяти и не дави на пользователя. Темы: "+openThreads.join(" | ")});
       if(lastProactiveText) messages.push({role:"system",content:"Твоя последняя самостоятельная реплика была: "+lastProactiveText+". Не повторяй её и не начинай снова ту же тему."});
       messages.push({role:"user",content:"Ты в голосовом разговоре с другом. Уже несколько минут нет новых реплик. Если есть естественный повод, коротко подхвати недавнюю тему, вспомни уместный незаконченный разговор или брось живое наблюдение. Не говори про таймер, молчание или то, что тебя попросили проявить инициативу. Не вымучивай вопрос и не начинай разговор просто ради заполнения паузы. Если сказать нечего — ответь ровно [SKIP]."});
     } else {
-      messages.push(...history.slice(-6));
-      if(screenStream){
+      messages.push(...history.slice(-4));
+      if(screenStream && wantsScreenSnapshot(userText)){
         if((settings.model||"").startsWith("qwen3.5")){
           const screenImage=await captureScreenImage();
           if(screenImage){
@@ -300,6 +295,8 @@ async function runAIRequest(userText, proactive=false){
         }else{
           messages.splice(1,0,{role:"system",content:"Пользователь включил показ экрана, но выбранная модель не поддерживает анализ изображений. Попроси выбрать Qwen3.5 9B."});
         }
+      }else if(screenStream && screenShareStatus){
+        screenShareStatus.textContent="Экран подключён · снимок отправится по запросу";
       }
     }
     const controller = new AbortController();
